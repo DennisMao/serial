@@ -39,7 +39,7 @@ type SerialPort struct {
 
 func New() *SerialPort {
 	// Create new file
-	file, err := os.OpenFile(fmt.Sprintf("log_serial_%d.txt", time.Now().Unix()), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	file, err := os.OpenFile(fmt.Sprintf(".//log//log_serial_%d.txt", time.Now().Unix()), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalln("Failed to open log file", ":", err)
 	}
@@ -219,6 +219,7 @@ func (sp *SerialPort) WaitForRegexTimeout(exp string, timeout time.Duration) (st
 			sp.log("INF >> Waiting for RegExp: \"%s\"", exp)
 			result := []string{}
 			for !timeExpired {
+				time.Sleep(time.Millisecond * 50) //fixed error pointer.
 				line, err := sp.ReadLine()
 				if err != nil {
 					// Do nothing
