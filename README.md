@@ -1,21 +1,23 @@
-# Serial
+# 串口模块
 
-Golang package for serial port
+本模块是一个使用Go语言编写的支持多系统下串口通讯模块，支持正则匹配应答指令，超时退出等功能。具有操作简单易用和多平台支持的特性。原作者[argandas](https://github.com/argandas)，本版本在原作者基础上修复了部分使用中发现的问题，增加独立日志模块。
 
-[![GoDoc](http://godoc.org/github.com/argandas/serial?status.svg)](http://godoc.org/github.com/argandas/serial)
+## 如何安装
 
-A Go package that allow you to read and write from the serial port.
+在终端下使用
 
-This is a forked repo written by [@tarm](github.com/tarm).
+```bash
+go get github.com/DennisMao/serial
+```
 
-## Usage
+## 程序样例
 
 ```go
 package main
  
 import (
 	"time"
-	"github.com/argandas/serial"
+	"github.com/DennisMao/serial"
 )
 
 func main() {
@@ -30,11 +32,12 @@ func main() {
 }
 ```
 
-## NonBlocking Mode
+## 非阻塞模式
 
-By default the returned serial port reads in blocking mode. Which means `Read()` will block until at least one byte is returned. If that's not what you want, specify a positive ReadTimeout and the Read() will timeout returning 0 bytes if no bytes are read.  Please note that this is the total timeout the read operation will wait and not the interval timeout between two bytes.
+在本模块默认的阻塞模式下，调用**Read()**操作，系统会一阻塞在函数内，并等待至少有一个byte数据返回的时候才退出。因此如果上述功能不符合需求，可以使用非阻塞模式。在非阻塞模式下，程序在初始化时候需要加入一个超时参数，当调用**Read()**操作无数据返回时会自动超时退出。
 
+非阻塞模式设置:
 ```go
 	sp := serial.New()
-    err := sp.Open("COM1", 9600, time.Second * 5)
+    err := sp.Open("COM1", 9600, time.Second * 5) //5s超时设置
 ```
