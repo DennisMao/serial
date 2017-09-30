@@ -2,6 +2,7 @@ package serial
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,6 +18,45 @@ const EOL_DEFAULT byte = '\n'
 /*******************************************************************************************
 *******************************   TYPE DEFINITIONS 	****************************************
 *******************************************************************************************/
+const DefaultSize = 8 // Default value for Config.Size
+
+type StopBits byte
+type Parity byte
+
+const (
+	Stop1     StopBits = 1
+	Stop1Half StopBits = 15
+	Stop2     StopBits = 2
+)
+
+const (
+	ParityNone  Parity = 'N'
+	ParityOdd   Parity = 'O'
+	ParityEven  Parity = 'E'
+	ParityMark  Parity = 'M' // parity bit is always 1
+	ParitySpace Parity = 'S' // parity bit is always 0
+)
+
+type Config struct {
+	Name        string
+	Baud        int
+	ReadTimeout time.Duration // Total timeout
+
+	// Size is the number of data bits. If 0, DefaultSize is used.
+	Size byte
+
+	// Parity is the bit to use and defaults to ParityNone (no parity bit).
+	Parity Parity
+
+	// Number of stop bits to use. Default is 1 (1 stop bit).
+	StopBits StopBits
+
+	// RTSFlowControl bool
+	// DTRFlowControl bool
+	// XONFlowControl bool
+
+	// CRLFTranslate bool
+}
 
 type SerialPort struct {
 	port          io.ReadWriteCloser
@@ -33,16 +73,35 @@ type SerialPort struct {
 	// openPort      func(port string, baud int) (io.ReadWriteCloser, error)
 }
 
+// ErrBadSize is returned if Size is not supported.
+var ErrBadSize error = errors.New("unsupported serial data size")
+
+// ErrBadStopBits is returned if the specified StopBits setting not supported.
+var ErrBadStopBits error = errors.New("unsupported stop bit setting")
+
+// ErrBadParity is returned if the parity is not supported.
+var ErrBadParity error = errors.New("unsupported parity setting")
+
 /*******************************************************************************************
 ********************************   BASIC FUNCTIONS  ****************************************
 *******************************************************************************************/
 
 func New() *SerialPort {
-	// Create new file
-	file, err := os.OpenFile(fmt.Sprintf(".//log//log_serial_%d.txt", time.Now().Unix()), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	y, m, d := time.Now().Date()
+	fname := fmt.Sprintf(".//log//sms_%04d%02d%02d.txt", y, m, d)
+	b, err := PathExists(fname)
+	var file *os.File
+	if b {
+		//Oen file
+		file, err = os.OpenFile(fname, os.O_WRONLY|os.O_APPEND, 0666)
+	} else {
+		// Create new file
+		file, err = os.OpenFile(fname, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	}
 	if err != nil {
 		log.Fatalln("Failed to open log file", ":", err)
 	}
+
 	multi := io.MultiWriter(file, os.Stdout)
 	return &SerialPort{
 		logger:  log.New(multi, "PREFIX: ", log.Ldate|log.Ltime),
@@ -52,17 +111,67 @@ func New() *SerialPort {
 	}
 }
 
-func (sp *SerialPort) Open(name string, baud int, timeout ...time.Duration) error {
+func (sp *SerialPort) Open(name string, baud int, timeout, parity, stopbit string) error {
 	// Check if port is open
 	if sp.portIsOpen {
 		return fmt.Errorf("\"%s\" is already open", name)
 	}
-	var readTimeout time.Duration
-	if len(timeout) > 0 {
-		readTimeout = timeout[0]
+
+	var serialCfg Config
+
+	if len(name) != 0 {
+		serialCfg.Name = name
 	}
+
+	if baud != 0 {
+		serialCfg.Baud = baud
+	}
+
+	if len(parity) != 0 {
+		switch parity {
+		case "N":
+			serialCfg.Parity = ParityNone
+		case "O":
+			serialCfg.Parity = ParityOdd
+		case "E":
+			serialCfg.Parity = ParityEven
+		case "M":
+			serialCfg.Parity = ParityMark
+		case "S":
+			serialCfg.Parity = ParitySpace
+		default:
+			return errors.New("Invalid parity")
+		}
+	}
+
+	if len(timeout) != 0 {
+		to, err := time.ParseDuration(timeout)
+		if err != nil {
+			return errors.New("Invalid time out params")
+		}
+		serialCfg.ReadTimeout = to
+	}
+
+	if len(stopbit) != 0 {
+		switch stopbit {
+		case "1":
+			serialCfg.StopBits = Stop1
+		case "1.5":
+			serialCfg.StopBits = Stop1Half
+		case "2":
+			serialCfg.StopBits = Stop2
+		default:
+			return errors.New("Invalid stop bits")
+		}
+	}
+
 	// Open serial port
-	comPort, err := openPort(name, baud, readTimeout)
+	comPort, err := openPort(serialCfg.Name,
+		serialCfg.Baud,
+		DefaultSize,
+		serialCfg.Parity,
+		serialCfg.StopBits,
+		serialCfg.ReadTimeout)
 	if err != nil {
 		return fmt.Errorf("Unable to open port \"%s\" - %s", name, err)
 	}
@@ -219,7 +328,7 @@ func (sp *SerialPort) WaitForRegexTimeout(exp string, timeout time.Duration) (st
 			sp.log("INF >> Waiting for RegExp: \"%s\"", exp)
 			result := []string{}
 			for !timeExpired {
-				time.Sleep(time.Millisecond * 50) //fixed error pointer.
+				time.Sleep(time.Millisecond * 50)
 				line, err := sp.ReadLine()
 				if err != nil {
 					// Do nothing
@@ -341,4 +450,15 @@ func posixTimeoutValues(readTimeout time.Duration) (vmin uint8, vtime uint8) {
 		}
 	}
 	return minBytesToRead, uint8(readTimeoutInDeci)
+}
+
+func PathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
