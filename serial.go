@@ -111,6 +111,12 @@ func New() *SerialPort {
 	}
 }
 
+//Create a connection with I/O device by serial com port
+//@name: COM1 - COM24
+//@baud: 9600/38400/115200...
+//@timeout: 1m = 1minutes / 1h = 1 hour  according to parser rule of offical TIME package
+//@parity: "N" = none / "O" = odd / "E" = even / "M" = mark / "S" = space
+//@stopbit: "1" = 1 bit / "1.5" = 1 half bit / "2" = 2 bits
 func (sp *SerialPort) Open(name string, baud int, timeout, parity, stopbit string) error {
 	// Check if port is open
 	if sp.portIsOpen {
