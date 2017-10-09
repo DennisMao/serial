@@ -114,10 +114,11 @@ func New() *SerialPort {
 //Create a connection with I/O device by serial com port
 //@name: COM1 - COM24
 //@baud: 9600/38400/115200...
+//@databits:"5"/"6"/"7"/"8"   DefaultSize = 8
 //@timeout: 1m = 1minutes / 1h = 1 hour  according to parser rule of offical TIME package
 //@parity: "N" = none / "O" = odd / "E" = even / "M" = mark / "S" = space
 //@stopbit: "1" = 1 bit / "1.5" = 1 half bit / "2" = 2 bits
-func (sp *SerialPort) Open(name string, baud int, timeout, parity, stopbit string) error {
+func (sp *SerialPort) Open(name string, baud int, databits, timeout, parity, stopbit string) error {
 	// Check if port is open
 	if sp.portIsOpen {
 		return fmt.Errorf("\"%s\" is already open", name)
@@ -171,16 +172,31 @@ func (sp *SerialPort) Open(name string, baud int, timeout, parity, stopbit strin
 		}
 	}
 
+	var databit byte
+	switch databits {
+	case "5":
+		databit = 5
+	case "6":
+		databit = 6
+	case "7":
+		databit = 7
+	case "8":
+		databit = DefaultSize
+	default:
+		databit = DefaultSize
+	}
+
 	// Open serial port
 	comPort, err := openPort(serialCfg.Name,
 		serialCfg.Baud,
-		DefaultSize,
+		databit,
 		serialCfg.Parity,
 		serialCfg.StopBits,
 		serialCfg.ReadTimeout)
 	if err != nil {
 		return fmt.Errorf("Unable to open port \"%s\" - %s", name, err)
 	}
+
 	// Open port succesfull
 	sp.name = name
 	sp.baud = baud
