@@ -38,6 +38,6 @@ func main() {
 
 非阻塞模式设置:
 ```go
-	sp := serial.New()
-    err := sp.Open("COM1", 9600, time.Second * 5) //5s超时设置
+sp := serial.New()
+err := sp.Open("COM1", 9600, time.Second * 5) //5s超时设置
 ```
